@@ -49,7 +49,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 GT_PATH = os.path.join(os.getcwd(), 'input', 'ground-truth', args.filename.split('_')[0])
 # DR_PATH = os.path.join(os.getcwd(), 'input', 'detection-results', arg.filename)
-DR_PATH = os.path.join('/mnt/hdd/mean-teacher-object-detection-our/', args.filename)
+DR_PATH = os.path.join('/mnt/hdd/mean-teacher-object-detection/', args.filename)
 # if there are no images then no animation can be shown
 IMG_PATH = os.path.join(os.getcwd(), 'input', 'images-optional')
 if os.path.exists(IMG_PATH):
@@ -367,6 +367,8 @@ ground_truth_files_list.sort()
 gt_counter_per_class = {}
 counter_images_per_class = {}
 
+per_frame_result = {}
+per_frame_result_fp = {}
 for txt_file in ground_truth_files_list:
     #print(txt_file)
     file_id = txt_file.split(".txt", 1)[0]
@@ -382,6 +384,7 @@ for txt_file in ground_truth_files_list:
     bounding_boxes = []
     is_difficult = False
     already_seen_classes = []
+    per_frame_result[file_id] = []
     for line in lines_list:
         try:
             if "difficult" in line:
@@ -419,6 +422,7 @@ for txt_file in ground_truth_files_list:
                         # if class didn't exist yet
                         counter_images_per_class[class_name] = 1
                     already_seen_classes.append(class_name)
+        per_frame_result[file_id].append({'bbox':bbox, 'tp': 0})
 
 
     # dump bounding_boxes into a ".json" file
@@ -489,7 +493,7 @@ for class_index, class_name in enumerate(gt_classes):
             if tmp_class_name == class_name:
                 #print("match")
                 bbox = left + " " + top + " " + right + " " +bottom
-                bounding_boxes.append({"confidence":confidence, "file_id":file_id, "bbox":bbox})
+                bounding_boxes.append({"confidence": confidence, "file_id":file_id, "bbox":bbox})
                 #print(bounding_boxes)
     # sort detection-results by decreasing confidence
     bounding_boxes.sort(key=lambda x:float(x['confidence']), reverse=True)
@@ -552,6 +556,7 @@ with open(results_files_path + "/results.txt", 'w') as results_file:
             gt_match = -1
             # load detected object bounding-box
             bb = [ float(x) for x in detection["bbox"].split() ]
+            gt_count = 0
             for obj in ground_truth_data:
                 # look for a class_name match
                 if obj["class_name"] == class_name:
@@ -599,6 +604,19 @@ with open(results_files_path + "/results.txt", 'w') as results_file:
                 fp[idx] = 1
                 if ovmax > 0:
                     status = "INSUFFICIENT OVERLAP"
+
+
+
+            if fp[idx] == 1:
+                if file_id not in per_frame_result_fp:
+                    per_frame_result_fp[file_id] = []
+                    per_frame_result_fp[file_id].append(detection['bbox'])
+                else:
+                    per_frame_result_fp[file_id].append(detection['bbox'])
+            if tp[idx] == 1:
+                for c,i in enumerate(per_frame_result[file_id]):
+                    if (i['bbox'] == gt_match['bbox']):
+                        per_frame_result[file_id][c]['tp'] = 1
 
             """
              Draw image to show animation
@@ -655,7 +673,16 @@ with open(results_files_path + "/results.txt", 'w') as results_file:
                 # save the image with all the objects drawn to it
                 cv2.imwrite(img_cumulative_path, img_cumulative)
 
-        #print(tp)
+        for item in per_frame_result:
+            for c in range(len(per_frame_result[item])):
+                if per_frame_result[item][c]['tp'] == 0:
+                    per_frame_result[item][c]['fn'] = 1 
+                else:
+                    per_frame_result[item][c]['fn'] = 0 
+        f = open(results_files_path + "/per_frame_results.txt", 'w')
+        json.dump(per_frame_result, f, indent=4, sort_keys=True) 
+        f = open(results_files_path + "/per_frame_results_fp.txt", 'w')
+        json.dump(per_frame_result_fp, f, indent=4, sort_keys=True) 
         # compute precision/recall
         cumsum = 0
         for idx, val in enumerate(fp):
@@ -756,7 +783,6 @@ for txt_file in dr_files_list:
             det_counter_per_class[class_name] = 1
 #print(det_counter_per_class)
 dr_classes = list(det_counter_per_class.keys())
-
 
 """
  Plot the total number of occurences of each class in the ground-truth
