@@ -49,7 +49,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 GT_PATH = os.path.join(os.getcwd(), 'input', 'ground-truth', args.filename.split('_')[0])
 # DR_PATH = os.path.join(os.getcwd(), 'input', 'detection-results', arg.filename)
-DR_PATH = os.path.join('/mnt/hdd/mean-teacher-object-detection/', args.filename)
+DR_PATH = os.path.join('/Volumes/Kuri-chan/mean-teacher-object-detection/', args.filename)
 # if there are no images then no animation can be shown
 IMG_PATH = os.path.join(os.getcwd(), 'input', 'images-optional')
 if os.path.exists(IMG_PATH):
